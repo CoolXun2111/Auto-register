@@ -51,7 +51,7 @@ class ConfigError(ValueError):
     """Raised when config file content is invalid."""
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Repeat WebUI actions by locating template images on screen.")
     parser.add_argument("--window", required=True, help="Target window title keyword to focus.")
     parser.add_argument("--config", required=True, help="Path to JSON step config.")
@@ -60,7 +60,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--confidence", type=float, default=0.8, help="Image match confidence [0, 1].")
     parser.add_argument("--retries", type=int, default=3, help="Retries per locate operation when matching fails.")
     parser.add_argument("--retry-delay", type=float, default=0.5, help="Delay seconds between retries.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def load_config(config_path: str) -> list[dict[str, Any]]:
@@ -160,12 +160,17 @@ def _save_failure_screenshot(step_name: str) -> Path:
     return path
 
 
-def locate_and_click(image_path: str, confidence: float = 0.8) -> bool:
+def _locate_center(image_path: str, confidence: float) -> Any | None:
     pyautogui = _require_pyautogui()
-    region = pyautogui.locateCenterOnScreen(image_path, confidence=confidence)
-    if not region:
+    return pyautogui.locateCenterOnScreen(image_path, confidence=confidence)
+
+
+def locate_and_click(image_path: str, confidence: float = 0.8) -> bool:
+    point = _locate_center(image_path=image_path, confidence=confidence)
+    if not point:
         return False
-    pyautogui.click(region.x, region.y)
+    pyautogui = _require_pyautogui()
+    pyautogui.click(point.x, point.y)
     return True
 
 
@@ -176,9 +181,11 @@ def _execute_step(step: dict[str, Any]) -> None:
     if action in {"click", "double_click"}:
         image = step["image"]
         matched = False
+        point = None
         for attempt in range(1, SETTINGS.retries + 1):
             _check_abort()
-            if locate_and_click(image, confidence=SETTINGS.confidence):
+            point = _locate_center(image_path=image, confidence=SETTINGS.confidence)
+            if point:
                 matched = True
                 break
             if attempt < SETTINGS.retries:
@@ -188,9 +195,11 @@ def _execute_step(step: dict[str, Any]) -> None:
             artifact = _save_failure_screenshot(name)
             raise RuntimeError(f"步骤 {name} 识别失败，截图已保存: {artifact}")
 
+        pyautogui = _require_pyautogui()
         if action == "double_click":
-            pyautogui = _require_pyautogui()
-            pyautogui.doubleClick()
+            pyautogui.doubleClick(point.x, point.y)
+        else:
+            pyautogui.click(point.x, point.y)
 
     elif action == "type":
         pyautogui = _require_pyautogui()
