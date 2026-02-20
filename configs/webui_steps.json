@@ -1,0 +1,25 @@
+{
+  "steps": [
+    {
+      "name": "点击查询按钮",
+      "image": "templates/search_button.png",
+      "action": "click",
+      "text": "",
+      "wait": 0.5
+    },
+    {
+      "name": "输入关键字",
+      "image": "",
+      "action": "type",
+      "text": "示例关键词",
+      "wait": 0.2
+    },
+    {
+      "name": "提交",
+      "image": "",
+      "action": "hotkey",
+      "text": "ctrl+enter",
+      "wait": 1.0
+    }
+  ]
+}
